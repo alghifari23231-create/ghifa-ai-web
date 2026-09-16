@@ -29,8 +29,6 @@ export async function POST(request: Request) {
     });
 
     // Backward-compatible fallback for older clients that still submit `reference`.
-    // The client-side order is character -> product -> background, so each image
-    // receives an explicit semantic role before it reaches Gemini.
     const genericReferences = form.getAll("reference").filter((item): item is File => item instanceof File);
     const references = roleReferences.length > 0
       ? roleReferences
@@ -40,8 +38,12 @@ export async function POST(request: Request) {
     if (!Number.isInteger(sceneNumber) || sceneNumber < 1) return error("Scene number tidak valid.");
     if (!ALLOWED_ASPECT_RATIOS.has(aspectRatio)) return error("Aspect ratio tidak didukung.");
     if (!ALLOWED_RESOLUTIONS.has(resolution)) return error("Resolution tidak didukung.");
-    if (references.length === 0) return error("Minimal satu reference image wajib dikirim.");
-    if (references.length > 3) return error("Maksimum tiga reference image per scene.");
+    if (references.length !== ROLES.length) return error("Scene renderer membutuhkan tepat 3 reference: Character, Product, dan Background.");
+
+    const roleSet = new Set(references.map(reference => reference.role));
+    const missingRoles = ROLES.filter(role => !roleSet.has(role));
+    if (missingRoles.length > 0) return error(`Reference role belum lengkap: ${missingRoles.join(", ")}.`);
+    if (references.length > ROLES.length) return error("Maksimum tiga reference image per scene.");
 
     for (const { file } of references) {
       if (!ALLOWED_TYPES.has(file.type)) return error("Reference hanya boleh JPG, PNG, atau WEBP.");
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
 
     const systemInstruction = `Generate Scene ${sceneNumber} as one complete photorealistic scene image for AQU.AI Affiliate Pro.
 
-The supplied images are visual references, not images to paste into the result. Each image has an explicit semantic role. Use the role mapping below before interpreting the images:
+The three supplied images are visual references, not images to paste into the result. Each image has an explicit semantic role. Use the role mapping below before interpreting the images:
 - CHARACTER REFERENCE: preserve the visible human identity and appearance only.
 - PRODUCT REFERENCE: preserve the exact visible product identity, design and physical properties only.
 - BACKGROUND REFERENCE: preserve the visible environment and spatial design only.
@@ -66,13 +68,14 @@ REFERENCE ROLE MAPPING:
 ${referenceBlocks.map((block) => `- ${block.role.toUpperCase()}: one supplied reference image`).join("\n")}
 
 IDENTITY LOCK:
-- Preserve the character's face, visible facial structure, skin appearance, hair/hijab, body proportions, clothing and accessories from the CHARACTER reference when supplied.
-- Preserve the exact visible product design, shape, colors, markings, materials/finish and proportions from the PRODUCT reference when supplied.
-- Preserve the visible environment, spatial layout, furniture, surfaces, colors and lighting cues from the BACKGROUND reference when supplied.
+- Preserve the character's face, visible facial structure, skin appearance, hair/hijab, body proportions, clothing and accessories from the CHARACTER reference.
+- Preserve the exact visible product design, shape, colors, markings, materials/finish and proportions from the PRODUCT reference.
+- Preserve the visible environment, spatial layout, furniture, surfaces, colors and lighting cues from the BACKGROUND reference.
 - Do not transfer visual traits from one role to another.
 - Do not invent or substitute unrelated objects.
-- Do not collage, split-screen, duplicate, overlay, watermark, or paste the references.
-- The output must look like a real photograph captured in the described scene.
+- Build one new coherent photograph in which the character, product and environment physically coexist in the same scene.
+- The references are inputs for visual grounding only. Do not paste, overlay, collage, split-screen, duplicate, or reproduce any reference image as a flat layer.
+- Do not return a portrait cutout, isolated product shot, or raw reference recreation unless the scene prompt explicitly requires that composition.
 - Natural anatomy, skin texture, hands, fingers, eyes, teeth, hair and fabric physics. No plastic skin or AI-perfect anatomy.
 
 COMPOSITION:
