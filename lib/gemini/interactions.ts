@@ -2,12 +2,52 @@ export type GeminiInputBlock =
   | { type: "text"; text: string }
   | { type: "image"; data: string; mime_type: string };
 
+type GeminiContentBlock = {
+  type?: string;
+  text?: string;
+  data?: string;
+  mime_type?: string;
+};
+
+type GeminiModelOutputStep = {
+  type?: string;
+  content?: GeminiContentBlock[];
+};
+
 export type GeminiInteractionResult = {
   id?: string;
+  status?: string;
+  model?: string;
   output_text?: string;
   output_image?: { data?: string; mime_type?: string };
-  steps?: unknown[];
+  steps?: GeminiModelOutputStep[];
 };
+
+function collectModelOutput(result: GeminiInteractionResult) {
+  const textParts: string[] = [];
+  let image: { data?: string; mime_type?: string } | undefined;
+
+  for (const step of result.steps ?? []) {
+    if (step.type !== "model_output") continue;
+
+    for (const block of step.content ?? []) {
+      if (block.type === "text" && typeof block.text === "string") {
+        textParts.push(block.text);
+      }
+      if (block.type === "image" && typeof block.data === "string" && !image) {
+        image = {
+          data: block.data,
+          mime_type: block.mime_type,
+        };
+      }
+    }
+  }
+
+  return {
+    outputText: textParts.join("\n"),
+    outputImage: image,
+  };
+}
 
 export async function runGeminiInteraction(options: {
   model: string;
@@ -36,18 +76,28 @@ export async function runGeminiInteraction(options: {
     cache: "no-store",
   });
 
+  const payload = (await response.json().catch(() => null)) as GeminiInteractionResult | null;
+
   if (!response.ok) {
-    const detail = await response.text();
-    console.error("Gemini Interaction error", response.status, detail);
+    console.error("Gemini Interaction error", response.status, payload);
     throw new Error("Gemini API gagal memproses request.");
   }
 
-  return (await response.json()) as GeminiInteractionResult;
+  if (!payload) throw new Error("Gemini API mengembalikan response kosong.");
+
+  const normalized = collectModelOutput(payload);
+
+  return {
+    ...payload,
+    output_text: normalized.outputText || payload.output_text,
+    output_image: normalized.outputImage || payload.output_image,
+  };
 }
 
 export function parseGeminiJson<T>(result: GeminiInteractionResult): T {
   const raw = result.output_text;
   if (!raw) throw new Error("Gemini tidak mengembalikan output JSON.");
+
   try {
     return JSON.parse(raw) as T;
   } catch (error) {
