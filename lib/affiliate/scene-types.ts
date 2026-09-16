@@ -7,6 +7,8 @@ export type AffiliateReferenceDNA = {
   background: ReferenceDNA | null;
 };
 
+export type AffiliateReferenceRole = "character" | "product" | "background";
+
 export type AffiliateScenePlan = {
   sceneNumber: number;
   title: string;
