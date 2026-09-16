@@ -1,0 +1,33 @@
+name: AQU.AI Build & Type Audit
+
+on:
+  push:
+    branches:
+      - main
+      - aquai-v2-foundation
+  pull_request:
+
+jobs:
+  build-and-type-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --no-audit
+
+      - name: Dependency security audit
+        run: npm audit --audit-level=high
+
+      - name: TypeScript audit
+        run: npx tsc --noEmit
+
+      - name: Next.js production build
+        run: npm run build
