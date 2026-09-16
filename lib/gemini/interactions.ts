@@ -85,6 +85,11 @@ export async function runGeminiInteraction(options: {
 
   if (!payload) throw new Error("Gemini API mengembalikan response kosong.");
 
+  if (["failed", "cancelled", "incomplete"].includes(payload.status || "")) {
+    console.error("Gemini Interaction incomplete/failed", payload.status, payload);
+    throw new Error(`Gemini API mengembalikan status ${payload.status}.`);
+  }
+
   const normalized = collectModelOutput(payload);
 
   return {
