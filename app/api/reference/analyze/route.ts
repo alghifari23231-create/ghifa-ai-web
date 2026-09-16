@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { fileToBase64, parseGeminiJson, runGeminiInteraction } from "../../../../lib/gemini/interactions";
-import type { ReferenceRole, VisionAnalysisResponse } from "../../../../lib/reference-intelligence/types";
+import type { ReferenceDNA, ReferenceRole, VisionAnalysisResponse } from "../../../../lib/reference-intelligence/types";
 
 const MODEL = process.env.GEMINI_VISION_MODEL || "gemini-3.6-flash";
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -83,7 +83,7 @@ Rules:
       },
     });
 
-    const parsed = parseGeminiJson<Omit<VisionAnalysisResponse, "referenceId" | "role" | "status" | "model" | "analyzedAt">>(result);
+    const parsed = parseGeminiJson<ReferenceDNA>(result);
 
     if (!parsed.summary || !Array.isArray(parsed.visualFacts) || !Array.isArray(parsed.identityAnchors) || !Array.isArray(parsed.continuityRules) || !Array.isArray(parsed.forbiddenAssumptions)) {
       return jsonError("Gemini Vision mengembalikan struktur analisis yang tidak lengkap.", 502);
