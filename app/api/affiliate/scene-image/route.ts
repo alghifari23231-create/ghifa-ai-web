@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fileToBase64, runGeminiInteraction } from "../../../../lib/gemini/interactions";
+import { fileToBase64, runGeminiInteraction, type GeminiInputBlock } from "../../../../lib/gemini/interactions";
 import type { AffiliateReferenceRole, AffiliateSceneImageResponse } from "../../../../lib/affiliate/scene-types";
 
 const MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
@@ -81,9 +81,14 @@ ${prompt}
 OUTPUT:
 One complete scene image only. No text, captions, UI, borders, storyboard labels, or reference-image collage.`;
 
+    const input: GeminiInputBlock[] = [
+      ...referenceBlocks.map(({ type, data, mime_type }) => ({ type, data, mime_type } as GeminiInputBlock)),
+      { type: "text", text: systemInstruction },
+    ];
+
     const result = await runGeminiInteraction({
       model: MODEL,
-      input: [...referenceBlocks.map(({ type, data, mime_type }) => ({ type, data, mime_type })), { type: "text", text: systemInstruction }],
+      input,
       responseFormat: {
         type: "image",
         mime_type: "image/jpeg",
