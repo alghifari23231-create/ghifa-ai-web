@@ -6,7 +6,7 @@ import { AquaiStudio } from "../components/AquaiStudio";
 
 export type ModuleKey = "affiliate" | "podcast" | "vlog" | "cinematic" | "cartoon";
 
-export const modules: { key: ModuleKey; number: string; title: string; subtitle: string; description: string; icon: string }[] = [
+const modules: { key: ModuleKey; number: string; title: string; subtitle: string; description: string; icon: string }[] = [
   { key: "affiliate", number: "01", title: "Affiliate Pro", subtitle: "Product Story", description: "Buat cerita affiliate, storyboard, dan prompt video dari reference visual.", icon: "✦" },
   { key: "podcast", number: "02", title: "Podcast", subtitle: "Studio & Interview", description: "Bangun podcast solo, duo, atau trio dengan continuity karakter dan dialog.", icon: "◉" },
   { key: "vlog", number: "03", title: "Vlog", subtitle: "Daily & Lifestyle", description: "Rancang vlog, travel, lifestyle, dan aktivitas harian berbasis reference.", icon: "◫" },
