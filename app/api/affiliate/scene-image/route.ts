@@ -22,10 +22,14 @@ export async function POST(request: Request) {
     const sceneNumber = Number(form.get("sceneNumber") || 0);
     const aspectRatio = String(form.get("aspectRatio") || "9:16");
     const resolution = String(form.get("resolution") || "1080p");
-    const references = ROLES.flatMap((role) => {
-      const files = form.getAll(`reference_${role}`).filter((item): item is File => item instanceof File);
-      return files.map((file) => ({ role, file }));
-    });
+
+    const explicitReferences = ROLES.flatMap((role) =>
+      form.getAll(`reference_${role}`).filter((item): item is File => item instanceof File).map((file) => ({ role, file })),
+    );
+    const legacyReferences = form.getAll("reference").filter((item): item is File => item instanceof File);
+    const references = explicitReferences.length > 0
+      ? explicitReferences
+      : legacyReferences.map((file, index) => ({ role: ROLES[index] || "background", file }));
 
     if (!prompt) return error("Image prompt wajib diisi.");
     if (!Number.isInteger(sceneNumber) || sceneNumber < 1) return error("Scene number tidak valid.");
@@ -74,7 +78,7 @@ One complete scene image only. No text, captions, UI, borders, storyboard labels
 
     const result = await runGeminiInteraction({
       model: MODEL,
-      input: [...referenceBlocks.map(({ type, data, mime_type }) => ({ type, data, mime_type })), { type: "text", text: systemInstruction }],
+      input: referenceBlocks.map(({ type, data, mime_type }) => ({ type, data, mime_type })).concat({ type: "text", text: systemInstruction }),
       responseFormat: {
         type: "image",
         mime_type: "image/jpeg",
