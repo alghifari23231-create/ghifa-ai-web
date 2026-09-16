@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { parseGeminiJson, runGeminiInteraction } from "../../../../lib/gemini/interactions";
 
 const MODEL = process.env.GEMINI_VISION_MODEL || "gemini-3.6-flash";
 
@@ -17,8 +18,7 @@ const responseSchema = {
 };
 
 export async function POST(request: Request) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return jsonError("GEMINI_API_KEY belum dikonfigurasi di server.", 500);
+  if (!process.env.GEMINI_API_KEY) return jsonError("GEMINI_API_KEY belum dikonfigurasi di server.", 500);
 
   let body: { productName?: string; category?: string; referenceDNA?: unknown };
   try {
@@ -53,31 +53,22 @@ Rules:
 7. Return only the requested JSON structure.`;
 
   try {
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        model: MODEL,
-        input: [{ type: "text", text: prompt }],
-        response_format: { type: "text", mime_type: "application/json", schema: responseSchema },
-      }),
+    const result = await runGeminiInteraction({
+      model: MODEL,
+      input: [{ type: "text", text: prompt }],
+      responseFormat: {
+        type: "text",
+        mime_type: "application/json",
+        schema: responseSchema,
+      },
     });
 
-    if (!response.ok) {
-      console.error("Gemini Product Description error", response.status, await response.text());
-      return jsonError("Gemini gagal membuat Auto Description. Coba lagi.", 502);
+    const parsed = parseGeminiJson<{ description: string; visualClaims: string[]; excludedClaims: string[] }>(result);
+    if (!parsed.description || !Array.isArray(parsed.visualClaims) || !Array.isArray(parsed.excludedClaims)) {
+      return jsonError("Gemini mengembalikan struktur Auto Description yang tidak lengkap.", 502);
     }
 
-    const payload = await response.json() as { output_text?: string; text?: string };
-    const raw = payload.output_text || payload.text;
-    if (!raw) return jsonError("Gemini tidak mengembalikan Auto Description yang valid.", 502);
-
-    try {
-      return NextResponse.json(JSON.parse(raw));
-    } catch {
-      console.error("Invalid Gemini product description JSON", raw);
-      return jsonError("Hasil Auto Description bukan JSON yang valid.", 502);
-    }
+    return NextResponse.json(parsed);
   } catch (error) {
     console.error("Product Description exception", error);
     return jsonError("Terjadi error saat menghubungkan ke Gemini.", 502);
