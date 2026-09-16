@@ -20,7 +20,10 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-audit
+
+      - name: Dependency security audit
+        run: npm audit --audit-level=high
 
       - name: TypeScript audit
         run: npx tsc --noEmit
