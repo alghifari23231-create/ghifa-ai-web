@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./affiliate.css";
 
 export const metadata: Metadata = {
   title: "AQU.AI — Creative Tools Directory",
