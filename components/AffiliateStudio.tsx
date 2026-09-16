@@ -59,7 +59,8 @@ export function AffiliateStudio({ onBack }: { onBack: () => void }) {
     setScenes(prev => prev.map((s, i) => i === index ? { ...s, imageStatus: "generating", error: undefined } : s));
     try {
       const form = new FormData(); form.append("prompt", scene.imagePrompt); form.append("sceneNumber", String(scene.sceneNumber)); form.append("aspectRatio", settings.video.aspectRatio); form.append("resolution", settings.video.resolution);
-      (Object.values(references) as Array<RefAsset | null>).filter((x): x is RefAsset => Boolean(x?.status === "analyzed")).forEach(x => form.append("reference", x.file));
+      const roleFields: Record<Role, string> = { character: "reference_character", product: "reference_product", background: "reference_background" };
+      (Object.entries(references) as Array<[Role, RefAsset | null]>).forEach(([role, asset]) => { if (asset?.status === "analyzed") form.append(roleFields[role], asset.file); });
       const ir = await fetch("/api/affiliate/scene-image", { method: "POST", body: form }); const image = await ir.json(); if (!ir.ok) throw new Error(image.error || `Scene ${scene.sceneNumber} image gagal.`);
       const imageUrl = `data:${image.mimeType || "image/png"};base64,${image.imageBase64}`; setScenes(prev => prev.map((s, i) => i === index ? { ...s, imageUrl, imageStatus: "ready", error: undefined } : s));
     } catch (e) {
@@ -80,14 +81,29 @@ export function AffiliateStudio({ onBack }: { onBack: () => void }) {
   };
 
   const generateScene = async (index: number, scene: SceneState) => {
-    await generateImageForScene(index, scene);
-    await generatePromptForScene(index, scene);
+    const result = { image: false, prompt: false };
+    try { await generateImageForScene(index, scene); result.image = true; } catch { /* keep prompt generation independent */ }
+    try { await generatePromptForScene(index, scene); result.prompt = true; } catch { /* scene-level status already records the error */ }
+    return result;
   };
 
   const buildScenes = async () => {
     if (!canGenerate) return; setGeneration("planning"); setGenerationError(""); setScenes([]); setActiveScene(0); setTab("storyboard");
-    try { const r = await fetch("/api/affiliate/scene-plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ settings, referenceDNA }) }); const p = await r.json() as AffiliateScenePlanResponse & { error?: string }; if (!r.ok) throw new Error(p.error || "Scene Planner gagal."); const planned = p.scenes.map(s => ({ ...s, imageStatus: "idle" as const, promptStatus: "idle" as const })); setScenes(planned); setGeneration("rendering"); for (let i = 0; i < planned.length; i++) await generateScene(i, planned[i]); setGeneration("ready"); }
-    catch (e) { setGeneration("failed"); setGenerationError(e instanceof Error ? e.message : "Generate AQU gagal."); }
+    try {
+      const r = await fetch("/api/affiliate/scene-plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ settings, referenceDNA }) });
+      const p = await r.json() as AffiliateScenePlanResponse & { error?: string };
+      if (!r.ok) throw new Error(p.error || "Scene Planner gagal.");
+      const planned = p.scenes.map(s => ({ ...s, imageStatus: "idle" as const, promptStatus: "idle" as const }));
+      setScenes(planned); setGeneration("rendering");
+      const results: Array<{ image: boolean; prompt: boolean }> = [];
+      for (let i = 0; i < planned.length; i++) results.push(await generateScene(i, planned[i]));
+      const failedScenes = results.filter(x => !x.image || !x.prompt).length;
+      const successfulScenes = results.length - failedScenes;
+      setGeneration("ready");
+      setGenerationError(failedScenes > 0 ? `${failedScenes} scene memiliki output yang gagal; ${successfulScenes} scene berhasil lengkap. Periksa status tiap scene dan gunakan Regenerate Image/Prompt pada bagian yang gagal.` : "");
+    } catch (e) {
+      setGeneration("failed"); setGenerationError(e instanceof Error ? e.message : "Generate AQU gagal.");
+    }
   };
 
   const regenerateImage = async (i: number) => {
