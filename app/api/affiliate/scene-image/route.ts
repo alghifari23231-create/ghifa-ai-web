@@ -5,6 +5,8 @@ import type { AffiliateSceneImageResponse } from "../../../../lib/affiliate/scen
 const MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ALLOWED_ASPECT_RATIOS = new Set(["9:16", "16:9", "1:1"]);
+const ALLOWED_RESOLUTIONS = new Set(["1080p", "2K", "4K"]);
 
 function error(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -23,6 +25,8 @@ export async function POST(request: Request) {
 
     if (!prompt) return error("Image prompt wajib diisi.");
     if (!Number.isInteger(sceneNumber) || sceneNumber < 1) return error("Scene number tidak valid.");
+    if (!ALLOWED_ASPECT_RATIOS.has(aspectRatio)) return error("Aspect ratio tidak didukung.");
+    if (!ALLOWED_RESOLUTIONS.has(resolution)) return error("Resolution tidak didukung.");
     if (files.length === 0) return error("Minimal satu reference image wajib dikirim.");
     if (files.length > 3) return error("Maksimum tiga reference image per scene.");
 
@@ -61,7 +65,7 @@ One complete scene image only. No text, captions, UI, borders, storyboard labels
       input: [...referenceBlocks, { type: "text", text: systemInstruction }],
       responseFormat: {
         type: "image",
-        mime_type: "image/png",
+        mime_type: "image/jpeg",
         aspect_ratio: aspectRatio,
         image_size: resolution === "4K" ? "4K" : resolution === "2K" ? "2K" : "1K",
       },
@@ -72,7 +76,7 @@ One complete scene image only. No text, captions, UI, borders, storyboard labels
     const response: AffiliateSceneImageResponse = {
       sceneNumber,
       model: MODEL,
-      mimeType: result.output_image.mime_type || "image/png",
+      mimeType: result.output_image.mime_type || "image/jpeg",
       imageBase64: result.output_image.data,
       generatedAt: new Date().toISOString(),
     };
