@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AffiliateStudio } from "../components/AffiliateStudio";
 import { AquaiStudio } from "../components/AquaiStudio";
 
 export type ModuleKey = "affiliate" | "podcast" | "vlog" | "cinematic" | "cartoon";
@@ -16,6 +17,7 @@ export const modules: { key: ModuleKey; number: string; title: string; subtitle:
 export default function Home() {
   const [selected, setSelected] = useState<ModuleKey | null>(null);
 
+  if (selected === "affiliate") return <AffiliateStudio onBack={() => setSelected(null)} />;
   if (selected) return <AquaiStudio moduleKey={selected} onBack={() => setSelected(null)} />;
 
   return (
