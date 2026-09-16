@@ -3,6 +3,7 @@ name: AQU.AI Build & Type Audit
 on:
   push:
     branches:
+      - main
       - aquai-v2-foundation
   pull_request:
 
